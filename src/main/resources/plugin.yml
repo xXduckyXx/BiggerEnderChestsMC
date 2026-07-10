@@ -1,0 +1,16 @@
+name: EnderChestDB
+version: 1.0.0
+main: com.echest.enderchest.EnderChestPlugin
+api-version: "1.21.11"
+commands:
+  enderchest:
+    aliases: [echest, ec]
+    description: Open your personal Ender Chest
+    usage: /<command>
+permissions:
+  enderchestdb.command:
+    description: Allows using /enderchest, /echest, /ec commands
+    default: op
+  enderchestdb.admin:
+    description: Allows admin operations like toggle
+    default: op
