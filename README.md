@@ -174,5 +174,7 @@ TO REPORT BUGS JUST JOIN MY DISCORD SERVER
 
 
 now go enjoy your bigger chest :3
- 
+
+**if you enjoy this mod**
+- Donate me: ko-fi.com/xxduckyxx
 
