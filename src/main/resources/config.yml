@@ -1,0 +1,6 @@
+migrated: false
+commands-enabled: true
+# Seconds between two autosaves of open ender chests. Set to 0 to disable the autosave.
+autosave-seconds: 60
+# Save the chest of a player right after he changed something in it.
+save-on-interaction: true

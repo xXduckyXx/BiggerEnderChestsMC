@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "biggerenderchests",
+  "version": "${version}",
+  "name": "Bigger Ender Chests",
+  "description": "A bigger ender chest with 54 slots, stored in SQLite. Server side only, vanilla clients can join.",
+  "authors": [
+    "xXduckyXx"
+  ],
+  "contact": {
+    "homepage": "https://github.com/xXduckyXx/BiggerEnderChestsMC",
+    "sources": "https://github.com/xXduckyXx/BiggerEnderChestsMC"
+  },
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "com.echest.enderchest.fabric.BiggerEnderChestsMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

@@ -1,0 +1,21 @@
+name: EnderChestDB
+version: 1.1.1
+main: com.echest.enderchest.EnderChestPlugin
+# The plugin is built against the Paper API of 1.21.11, the api version is set to 1.21 so it
+# also loads on the other 1.21 releases. Only 1.21.11 was tested.
+api-version: "1.21"
+description: A bigger ender chest with 54 slots, stored in SQLite.
+authors: [xXduckyXx]
+website: https://github.com/xXduckyXx/BiggerEnderChestsMC
+commands:
+  enderchest:
+    aliases: [echest, ec]
+    description: Open your personal Ender Chest
+    usage: /<command>
+permissions:
+  enderchestdb.command:
+    description: Allows using /enderchest, /echest, /ec commands
+    default: op
+  enderchestdb.admin:
+    description: Allows admin operations like toggle, export, import, backups and restore
+    default: op
