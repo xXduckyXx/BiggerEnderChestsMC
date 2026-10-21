@@ -156,17 +156,6 @@ BACKUP YOUR WORLD BEFORE USING THIS - YOU HAVE BEEN WARNED
 DONT BLAME ME IF YOUR ITEMS GET MESSED UP - ITS A MOD NOT OFFICIAL CONTENT
 
 IF YOU DONT LIKE IT FORK THE CODE ITS MIT FOR A REASON
-
------------------------------
-
-**notes and known limits:**
-
-mod is server side only, window is vanilla chest window with six rows
-a client that is not a vanilla client cannot join
-
-items that cannot be read keep their raw bytes, slot shows a placeholder, bytes written back unchanged next save
-an item that cannot be serialized keeps the bytes already stored, if there are none the write is refused instead of deleting the item
-content of the window is saved when closed and when server stops
 a crash of the server loses the items that were in the window, there is no autosave yet
 bigger ender chest cant be moved into vanilla ender chest when it holds more than 27 stacks
 
