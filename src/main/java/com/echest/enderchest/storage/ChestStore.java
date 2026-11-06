@@ -136,15 +136,39 @@ public final class ChestStore implements AutoCloseable {
      */
     public void writeContents(UUID uuid, byte[] blob, String reason) throws SQLException {
         synchronized (lock) {
-            byte[] previous = readContentsLocked(uuid);
-            if (previous != null) {
-                backupLocked(uuid, previous, reason);
-            }
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT OR REPLACE INTO enderchest (uuid, contents) VALUES (?, ?)")) {
-                statement.setString(1, uuid.toString());
-                statement.setBytes(2, blob);
-                statement.executeUpdate();
+            replaceContentsLocked(uuid, blob, reason);
+        }
+    }
+
+    /**
+     * Writes the contents of a player and stores the fingerprint of the imported content in the
+     * same transaction.
+     *
+     * <p>Writing the row and the import marker separately is not crash safe: when the server dies
+     * between the two statements the row is replaced but the marker is missing, so the same
+     * vanilla content is imported again on the next join and every item is duplicated. Both
+     * statements are therefore committed together.
+     *
+     * @param uuid        the player
+     * @param blob        the new contents
+     * @param reason      short description stored with the backup
+     * @param fingerprint fingerprint of the imported content
+     * @throws SQLException on database errors
+     */
+    public void writeContentsAndMarkImported(UUID uuid, byte[] blob, String reason,
+                                             String fingerprint) throws SQLException {
+        synchronized (lock) {
+            boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                replaceContentsLocked(uuid, blob, reason);
+                markImportedLocked(uuid, fingerprint);
+                connection.commit();
+            } catch (SQLException e) {
+                connection.rollback();
+                throw e;
+            } finally {
+                connection.setAutoCommit(autoCommit);
             }
         }
     }
@@ -303,14 +327,7 @@ public final class ChestStore implements AutoCloseable {
      */
     public void markImported(UUID uuid, String fingerprint) throws SQLException {
         synchronized (lock) {
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT OR REPLACE INTO enderchest_import (uuid, fingerprint, imported_at) "
-                            + "VALUES (?, ?, ?)")) {
-                statement.setString(1, uuid.toString());
-                statement.setString(2, fingerprint);
-                statement.setLong(3, System.currentTimeMillis());
-                statement.executeUpdate();
-            }
+            markImportedLocked(uuid, fingerprint);
         }
     }
 
@@ -340,6 +357,30 @@ public final class ChestStore implements AutoCloseable {
             } catch (SQLException e) {
                 logger.log(Level.WARNING, "Failed to close the ender chest database", e);
             }
+        }
+    }
+
+    private void replaceContentsLocked(UUID uuid, byte[] blob, String reason) throws SQLException {
+        byte[] previous = readContentsLocked(uuid);
+        if (previous != null) {
+            backupLocked(uuid, previous, reason);
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT OR REPLACE INTO enderchest (uuid, contents) VALUES (?, ?)")) {
+            statement.setString(1, uuid.toString());
+            statement.setBytes(2, blob);
+            statement.executeUpdate();
+        }
+    }
+
+    private void markImportedLocked(UUID uuid, String fingerprint) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "INSERT OR REPLACE INTO enderchest_import (uuid, fingerprint, imported_at) "
+                        + "VALUES (?, ?, ?)")) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, fingerprint);
+            statement.setLong(3, System.currentTimeMillis());
+            statement.executeUpdate();
         }
     }
 
