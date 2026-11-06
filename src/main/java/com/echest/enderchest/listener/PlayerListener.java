@@ -296,10 +296,19 @@ public class PlayerListener implements Listener {
 
     /**
      * Saves the chest of a player shortly after a drag.
+     *
+     * <p>A drag does not fire an {@link InventoryClickEvent}, so the locked slots have to be
+     * checked here as well. Without this a player could drag the placeholder of an unreadable
+     * slot out of its slot, and the placeholder would then be saved as a real item.
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInventoryDrag(InventoryDragEvent event) {
         if (!EnderChestGUI.isOurGUI(event.getInventory())) return;
+        if (event.getInventory().getHolder() instanceof EnderChestHolder holder
+                && holder.touchesLockedSlot(event.getRawSlots())) {
+            event.setCancelled(true);
+            return;
+        }
         if (!plugin.getConfig().getBoolean("save-on-interaction", true)) return;
 
         markDirty(event.getView().getPlayer().getUniqueId());

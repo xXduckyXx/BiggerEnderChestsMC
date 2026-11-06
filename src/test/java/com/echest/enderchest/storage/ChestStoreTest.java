@@ -173,6 +173,34 @@ class ChestStoreTest {
     }
 
     @Test
+    void writesTheContentsAndTheImportMarkerTogether() throws SQLException {
+        UUID uuid = UUID.randomUUID();
+        byte[] blob = SlotCodec.encode(new byte[][]{{9}});
+
+        store.writeContentsAndMarkImported(uuid, blob, "import", "fingerprint");
+
+        assertArrayEquals(blob, store.readContents(uuid));
+        assertEquals("fingerprint", store.readImportFingerprint(uuid));
+        assertTrue(store.readBackups(uuid, 10).isEmpty());
+    }
+
+    @Test
+    void backsUpTheOldContentsWhenWritingTheImportMarker() throws SQLException {
+        UUID uuid = UUID.randomUUID();
+        byte[] first = SlotCodec.encode(new byte[][]{{1}});
+        byte[] second = SlotCodec.encode(new byte[][]{{2}});
+        store.writeContents(uuid, first, "first");
+
+        store.writeContentsAndMarkImported(uuid, second, "import", "fingerprint");
+
+        assertArrayEquals(second, store.readContents(uuid));
+        List<ChestStore.Backup> backups = store.readBackups(uuid, 10);
+        assertEquals(1, backups.size());
+        assertArrayEquals(first, backups.get(0).contents());
+        assertEquals("import", backups.get(0).reason());
+    }
+
+    @Test
     void usesTheSameTableLayoutAsTheOldReleases() throws SQLException {
         // The table of the previous releases must stay readable.
         UUID uuid = UUID.randomUUID();

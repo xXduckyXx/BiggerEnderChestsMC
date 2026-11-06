@@ -293,16 +293,14 @@ public class DatabaseManager implements AutoCloseable {
 
         Entry entry = cache.get(uuid);
         // The items have to be in the database before the vanilla ender chest is cleared,
-        // otherwise they are lost when the write fails.
-        if (!writePayloadsSync(uuid, merged.merged(), entry != null ? entry.trailing() : null)) {
+        // otherwise they are lost when the write fails. When something was imported the marker is
+        // written in the same transaction, so a crash cannot make the next join import it again.
+        String fingerprintToStore = mergedCount > 0 ? fingerprint : null;
+        if (!writePayloadsSync(uuid, merged.merged(), entry != null ? entry.trailing() : null,
+                fingerprintToStore)) {
             logger.severe("Could not store the ender chest of " + uuid
                     + ", the vanilla ender chest was left untouched.");
             return new VanillaMergeResult(vanillaContents.clone(), 0, failedSlots.size(), false, false);
-        }
-
-        if (mergedCount > 0) {
-            // Remember what was imported, the same content must not be imported a second time.
-            markImported(uuid, fingerprint);
         }
 
         return new VanillaMergeResult(remaining, mergedCount, failedSlots.size(), true, false);
@@ -467,7 +465,7 @@ public class DatabaseManager implements AutoCloseable {
 
         if (synchronous) {
             CompletableFuture<SaveResult> future = new CompletableFuture<>();
-            write(uuid, plan.payloads(), trailing, plan.failedSlots(), future::complete);
+            write(uuid, plan.payloads(), trailing, plan.failedSlots(), null, future::complete);
             try {
                 return future.get(SYNC_SAVE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             } catch (Exception e) {
@@ -478,18 +476,25 @@ public class DatabaseManager implements AutoCloseable {
             }
         }
 
-        write(uuid, plan.payloads(), trailing, plan.failedSlots(), result -> {
+        write(uuid, plan.payloads(), trailing, plan.failedSlots(), null, result -> {
         });
         return new SaveResult(true, plan.failedSlots(), false, null);
     }
 
     private void write(UUID uuid, byte[][] payloads, byte[] trailing, List<Integer> failedSlots,
+                       String importFingerprint,
                        java.util.function.Consumer<SaveResult> callback) {
         byte[] blob = SlotCodec.encode(payloads, trailing);
         pending.put(uuid, payloads);
         writer.execute(() -> {
             try {
-                store.writeContents(uuid, blob, "save");
+                if (importFingerprint != null) {
+                    // The row and the import marker have to be written together, otherwise a
+                    // crash in between makes the next join import the same content again.
+                    store.writeContentsAndMarkImported(uuid, blob, "save", importFingerprint);
+                } else {
+                    store.writeContents(uuid, blob, "save");
+                }
                 cache.put(uuid, new Entry(toContents(payloads), trailing));
                 failures.remove(uuid);
                 callback.accept(new SaveResult(true, failedSlots, false, null));
@@ -516,8 +521,26 @@ public class DatabaseManager implements AutoCloseable {
      * @return {@code true} when the data is stored
      */
     private boolean writePayloadsSync(UUID uuid, byte[][] payloads, byte[] trailing) {
+        return writePayloadsSync(uuid, payloads, trailing, null);
+    }
+
+    /**
+     * Writes already serialized payloads and optionally the import marker, then waits for the
+     * database write.
+     *
+     * <p>The merge of the vanilla ender chest uses this. The vanilla chest is only cleared after
+     * the write succeeded, otherwise the items would be lost when the write fails.
+     *
+     * @param uuid             the player
+     * @param payloads         the payloads
+     * @param trailing         bytes of the old row that could not be parsed
+     * @param importFingerprint fingerprint to store in the same transaction, or {@code null}
+     * @return {@code true} when the data is stored
+     */
+    private boolean writePayloadsSync(UUID uuid, byte[][] payloads, byte[] trailing,
+                                      String importFingerprint) {
         CompletableFuture<SaveResult> future = new CompletableFuture<>();
-        write(uuid, payloads, trailing, List.of(), future::complete);
+        write(uuid, payloads, trailing, List.of(), importFingerprint, future::complete);
         try {
             SaveResult result = future.get(SYNC_SAVE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             return result.success();
@@ -542,20 +565,6 @@ public class DatabaseManager implements AutoCloseable {
         } catch (SQLException e) {
             logger.log(Level.WARNING, "Failed to read the import marker of " + uuid, e);
             return null;
-        }
-    }
-
-    /**
-     * Stores the fingerprint of the content that was imported.
-     *
-     * @param uuid        the player
-     * @param fingerprint the fingerprint of the imported content
-     */
-    private void markImported(UUID uuid, String fingerprint) {
-        try {
-            store.markImported(uuid, fingerprint);
-        } catch (SQLException e) {
-            logger.log(Level.WARNING, "Failed to store the import marker of " + uuid, e);
         }
     }
 
